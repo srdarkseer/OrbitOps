@@ -1,0 +1,14 @@
+[project]
+name = "orbitops"
+version = "0.1.0"
+description = "Multi-Agent Cloud Orchestrator for AWS/Azure"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = []
+
+[tool.commitlint]
+extends = ["@commitlint/config-conventional"]
+
