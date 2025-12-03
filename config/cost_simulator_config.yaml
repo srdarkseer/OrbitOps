@@ -1,0 +1,115 @@
+# Configuration for Agent 3: Cost Simulator
+
+# Currency settings
+currency:
+  default: "USD"
+  supported:
+    - "USD"
+    - "EUR"
+    - "GBP"
+    - "JPY"
+    - "CAD"
+    - "AUD"
+
+# Pricing data sources
+pricing_sources:
+  aws:
+    api: "https://pricing.us-east-1.amazonaws.com"
+    cache_duration_hours: 24
+  azure:
+    api: "https://prices.azure.com/api/retail/prices"
+    cache_duration_hours: 24
+
+# Simulation settings
+simulation:
+  default_time_period: "monthly"
+  supported_periods:
+    - "monthly"
+    - "annual"
+    - "quarterly"
+    - "custom_days"
+  
+  # Cost calculation precision
+  decimal_places: 2
+  rounding_method: "round"  # round, floor, ceiling
+
+# Cost breakdown categories
+cost_categories:
+  - "compute"
+  - "storage"
+  - "networking"
+  - "security"
+  - "database"
+  - "analytics"
+  - "other"
+
+# Default pricing (fallback if API unavailable)
+default_pricing:
+  aws:
+    ec2:
+      t2.micro: 0.0116  # per hour
+      t2.small: 0.023
+      t2.medium: 0.0464
+      t2.large: 0.0928
+    s3:
+      standard_storage: 0.023  # per GB per month
+      standard_requests: 0.0004  # per 1000 requests
+    elb:
+      application_load_balancer: 0.0225  # per hour
+      network_load_balancer: 0.0225  # per hour
+  
+  azure:
+    compute:
+      basic_a1: 0.025  # per hour
+      standard_a1: 0.05
+    storage:
+      blob_storage: 0.0184  # per GB per month
+    load_balancer:
+      standard: 0.025  # per hour
+
+# Cost estimation methods
+estimation_methods:
+  current:
+    use_cached_pricing: true
+    fallback_to_defaults: true
+  
+  projected:
+    apply_savings: true
+    include_optimization_costs: false  # Cost of implementing changes
+  
+  what_if:
+    validate_scenarios: true
+    allow_negative_costs: false
+  
+  comparison:
+    highlight_differences: true
+    sort_by_cost: true
+
+# Reporting settings
+reporting:
+  include_breakdown: true
+  include_charts: false  # For future visualization
+  include_recommendations: true
+  format: "json"  # json, csv, html
+
+# Time-based projections
+projections:
+  # Growth scenarios
+  growth_scenarios:
+    conservative: 0.05  # 5% annual growth
+    moderate: 0.10  # 10% annual growth
+    aggressive: 0.20  # 20% annual growth
+  
+  # Discount factors (for reserved instances, etc.)
+  discount_factors:
+    reserved_instance_1yr: 0.30
+    reserved_instance_3yr: 0.50
+    savings_plans: 0.17
+    spot_instances: 0.70
+
+# Alert thresholds
+alerts:
+  cost_increase_threshold_percent: 20
+  cost_decrease_threshold_percent: 50
+  absolute_cost_threshold: 10000  # USD
+
