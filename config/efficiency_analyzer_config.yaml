@@ -1,0 +1,88 @@
+# Configuration for Agent 2: Efficiency Analyzer
+
+# Analysis depth settings
+analysis_depth:
+  basic:
+    use_llm: false
+    check_patterns: false
+  detailed:
+    use_llm: true
+    check_patterns: true
+  comprehensive:
+    use_llm: true
+    check_patterns: true
+    deep_analysis: true
+
+# Thresholds for detecting inefficiencies
+thresholds:
+  compute:
+    underutilized_cpu_percent: 20
+    underutilized_memory_percent: 20
+    over_provisioned_cpu_percent: 30
+    instance_types_to_check: ["large", "xlarge", "2xlarge", "4xlarge"]
+  
+  storage:
+    empty_bucket_size_gb: 0
+    unused_bucket_days: 90
+    archive_candidate_days: 180
+  
+  networking:
+    idle_load_balancer_connections: 0
+    idle_nat_gateway_hours: 720  # 30 days
+  
+  security:
+    require_iam_roles: true
+    require_encryption: true
+    require_logging: true
+
+# Severity levels
+severity:
+  critical:
+    - missing_iam
+    - public_exposure
+    - no_encryption
+  high:
+    - underutilized_instance
+    - idle_load_balancer
+    - data_breach_risk
+  medium:
+    - over_provisioned
+    - unused_storage
+    - missing_backup
+  low:
+    - empty_bucket
+    - minor_config_issue
+    - optimization_opportunity
+
+# Cost estimation settings
+cost_estimation:
+  currency: "USD"
+  savings_percentage:
+    underutilized_instance: 0.5
+    over_provisioned: 0.3
+    unused_storage: 0.7
+    idle_load_balancer: 1.0
+    empty_bucket: 1.0
+
+# Focus areas for analysis
+focus_areas:
+  - compute
+  - storage
+  - networking
+  - security
+  - cost
+  - performance
+
+# LLM analysis settings
+llm_analysis:
+  enabled: true
+  model: "gpt-4"  # or "claude-3", etc.
+  max_tokens: 2000
+  temperature: 0.3  # Lower for more deterministic analysis
+  patterns_to_detect:
+    - anti_patterns
+    - cost_anomalies
+    - performance_bottlenecks
+    - security_vulnerabilities
+    - best_practice_violations
+
