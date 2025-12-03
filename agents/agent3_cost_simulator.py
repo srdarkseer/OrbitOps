@@ -13,6 +13,12 @@ It helps predict the financial impact of infrastructure changes.
 
 from typing import Dict, Any, List, Optional
 from agents.base_agent import BaseAgent, AgentResult, AgentStatus
+from agents.cost_utils import (
+    calculate_monthly_to_annual,
+    calculate_savings_percentage,
+    format_cost,
+    calculate_total_cost_breakdown
+)
 from datetime import datetime, timedelta
 import json
 
@@ -158,12 +164,15 @@ class CostSimulatorAgent(BaseAgent):
             costs["networking"] += lb.get("monthly_cost", 0)
         
         total = sum(costs.values())
+        breakdown_analysis = calculate_total_cost_breakdown(costs)
         
         return {
             "current_costs": {
                 "monthly": total,
-                "annual": total * 12,
+                "annual": calculate_monthly_to_annual(total),
                 "breakdown": costs,
+                "breakdown_percentages": breakdown_analysis["percentages"],
+                "largest_category": breakdown_analysis["largest_category"],
                 "currency": self._currency
             },
             "resource_count": {
@@ -215,17 +224,19 @@ class CostSimulatorAgent(BaseAgent):
             except:
                 multiplier = 1
         
+        savings_percentage = calculate_savings_percentage(current_monthly, projected_monthly)
+        
         return {
             "current_costs": current["current_costs"],
             "projected_costs": {
                 "monthly": projected_monthly,
-                "annual": projected_monthly * 12,
+                "annual": calculate_monthly_to_annual(projected_monthly),
                 "currency": self._currency
             },
             "savings": {
                 "monthly": total_savings,
-                "annual": total_savings * 12,
-                "percentage": (total_savings / current_monthly * 100) if current_monthly > 0 else 0,
+                "annual": calculate_monthly_to_annual(total_savings),
+                "percentage": savings_percentage,
                 "currency": self._currency
             },
             "projection_period": time_period,
@@ -276,12 +287,19 @@ class CostSimulatorAgent(BaseAgent):
                     affected_cost = change.get("affected_cost", 0)
                     scenario_cost += affected_cost * (scale_factor - 1.0)
             
+            difference = scenario_cost - current_monthly
+            difference_percentage = calculate_savings_percentage(
+                current_monthly, scenario_cost
+            ) if scenario_cost < current_monthly else -calculate_savings_percentage(
+                scenario_cost, current_monthly
+            ) if scenario_cost > current_monthly else 0
+            
             scenario_results.append({
                 "name": scenario_name,
                 "monthly_cost": scenario_cost,
-                "annual_cost": scenario_cost * 12,
-                "difference": scenario_cost - current_monthly,
-                "difference_percentage": ((scenario_cost - current_monthly) / current_monthly * 100) if current_monthly > 0 else 0,
+                "annual_cost": calculate_monthly_to_annual(scenario_cost),
+                "difference": difference,
+                "difference_percentage": difference_percentage,
                 "changes": changes
             })
         
