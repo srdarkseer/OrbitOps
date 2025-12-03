@@ -1,3 +1,5 @@
-# Core dependencies will be added as we develop
-# Placeholder for now
+# Core dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pyyaml>=6.0
 
