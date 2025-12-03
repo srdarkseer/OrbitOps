@@ -13,8 +13,10 @@ Areas of analysis:
 - Right-sizing opportunities
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from agents.base_agent import BaseAgent, AgentResult, AgentStatus
+import yaml
+import os
 
 
 class EfficiencyAnalyzerAgent(BaseAgent):
@@ -30,13 +32,51 @@ class EfficiencyAnalyzerAgent(BaseAgent):
     - Security improvements
     """
     
-    def __init__(self):
-        """Initialize the Efficiency Analyzer Agent"""
+    def __init__(self, config_path: Optional[str] = None):
+        """
+        Initialize the Efficiency Analyzer Agent.
+        
+        Args:
+            config_path: Optional path to configuration file
+        """
         super().__init__(
             agent_id="agent2_efficiency_analyzer",
             name="Efficiency Analyzer",
             description="Identifies inefficiencies and optimization opportunities in cloud architecture"
         )
+        self.config = self._load_config(config_path)
+    
+    def _load_config(self, config_path: Optional[str]) -> Dict[str, Any]:
+        """Load configuration from file or use defaults"""
+        if config_path and os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        
+        # Default configuration
+        return {
+            "thresholds": {
+                "compute": {
+                    "underutilized_cpu_percent": 20,
+                    "underutilized_memory_percent": 20,
+                    "over_provisioned_cpu_percent": 30
+                },
+                "storage": {
+                    "unused_bucket_days": 90
+                },
+                "networking": {
+                    "idle_load_balancer_connections": 0
+                }
+            },
+            "cost_estimation": {
+                "currency": "USD",
+                "savings_percentage": {
+                    "underutilized_instance": 0.5,
+                    "over_provisioned": 0.3,
+                    "unused_storage": 0.7,
+                    "idle_load_balancer": 1.0
+                }
+            }
+        }
     
     def get_required_inputs(self) -> List[str]:
         """
@@ -166,6 +206,11 @@ class EfficiencyAnalyzerAgent(BaseAgent):
         """Analyze compute resources for inefficiencies"""
         findings = []
         
+        thresholds = self.config.get("thresholds", {}).get("compute", {})
+        cpu_threshold = thresholds.get("underutilized_cpu_percent", 20)
+        memory_threshold = thresholds.get("underutilized_memory_percent", 20)
+        over_prov_threshold = thresholds.get("over_provisioned_cpu_percent", 30)
+        
         instances = compute_data.get("instances", [])
         
         # Check for underutilized instances
@@ -174,30 +219,33 @@ class EfficiencyAnalyzerAgent(BaseAgent):
             cpu_util = utilization.get("cpu", 0)
             memory_util = utilization.get("memory", 0)
             
-            if cpu_util < 20 and memory_util < 20:
+            if cpu_util < cpu_threshold and memory_util < memory_threshold:
+                savings_pct = self.config.get("cost_estimation", {}).get("savings_percentage", {}).get("underutilized_instance", 0.5)
                 findings.append({
                     "type": "underutilized_instance",
                     "resource_id": instance.get("id"),
                     "severity": "high",
                     "description": f"Instance {instance.get('id')} is underutilized (CPU: {cpu_util}%, Memory: {memory_util}%)",
                     "recommendation": "Consider right-sizing or consolidating instances",
-                    "potential_savings": instance.get("monthly_cost", 0) * 0.5,  # Estimate 50% savings
+                    "potential_savings": instance.get("monthly_cost", 0) * savings_pct,
                     "category": "compute"
                 })
         
         # Check for over-provisioned instances
+        instance_types_to_check = thresholds.get("instance_types_to_check", ["large", "xlarge"])
         for instance in instances:
-            instance_type = instance.get("instance_type", "")
-            if "large" in instance_type.lower() or "xlarge" in instance_type.lower():
+            instance_type = instance.get("instance_type", "").lower()
+            if any(size in instance_type for size in instance_types_to_check):
                 utilization = instance.get("utilization", {})
-                if utilization.get("cpu", 0) < 30:
+                if utilization.get("cpu", 0) < over_prov_threshold:
+                    savings_pct = self.config.get("cost_estimation", {}).get("savings_percentage", {}).get("over_provisioned", 0.3)
                     findings.append({
                         "type": "over_provisioned",
                         "resource_id": instance.get("id"),
                         "severity": "medium",
                         "description": f"Instance {instance.get('id')} may be over-provisioned",
                         "recommendation": "Consider downsizing to a smaller instance type",
-                        "potential_savings": instance.get("monthly_cost", 0) * 0.3,
+                        "potential_savings": instance.get("monthly_cost", 0) * savings_pct,
                         "category": "compute"
                     })
         
@@ -207,6 +255,9 @@ class EfficiencyAnalyzerAgent(BaseAgent):
         """Analyze storage resources for inefficiencies"""
         findings = []
         
+        thresholds = self.config.get("thresholds", {}).get("storage", {})
+        unused_days = thresholds.get("unused_bucket_days", 90)
+        
         buckets = storage_data.get("buckets", [])
         
         # Check for unused or empty buckets
@@ -215,23 +266,25 @@ class EfficiencyAnalyzerAgent(BaseAgent):
             last_accessed = bucket.get("last_accessed_days_ago", 999)
             
             if size == 0:
+                savings_pct = self.config.get("cost_estimation", {}).get("savings_percentage", {}).get("empty_bucket", 1.0)
                 findings.append({
                     "type": "empty_bucket",
                     "resource_id": bucket.get("id"),
                     "severity": "low",
                     "description": f"Storage bucket {bucket.get('id')} is empty",
                     "recommendation": "Consider deleting if not needed",
-                    "potential_savings": bucket.get("monthly_cost", 0),
+                    "potential_savings": bucket.get("monthly_cost", 0) * savings_pct,
                     "category": "storage"
                 })
-            elif last_accessed > 90:
+            elif last_accessed > unused_days:
+                savings_pct = self.config.get("cost_estimation", {}).get("savings_percentage", {}).get("unused_storage", 0.7)
                 findings.append({
                     "type": "unused_storage",
                     "resource_id": bucket.get("id"),
                     "severity": "medium",
                     "description": f"Storage bucket {bucket.get('id')} hasn't been accessed in {last_accessed} days",
                     "recommendation": "Consider moving to cheaper storage tier or archiving",
-                    "potential_savings": bucket.get("monthly_cost", 0) * 0.7,
+                    "potential_savings": bucket.get("monthly_cost", 0) * savings_pct,
                     "category": "storage"
                 })
         
@@ -241,19 +294,23 @@ class EfficiencyAnalyzerAgent(BaseAgent):
         """Analyze networking for inefficiencies"""
         findings = []
         
+        thresholds = self.config.get("thresholds", {}).get("networking", {})
+        idle_threshold = thresholds.get("idle_load_balancer_connections", 0)
+        
         load_balancers = networking_data.get("load_balancers", [])
         
         # Check for idle load balancers
         for lb in load_balancers:
             active_connections = lb.get("active_connections", 0)
-            if active_connections == 0:
+            if active_connections <= idle_threshold:
+                savings_pct = self.config.get("cost_estimation", {}).get("savings_percentage", {}).get("idle_load_balancer", 1.0)
                 findings.append({
                     "type": "idle_load_balancer",
                     "resource_id": lb.get("id"),
                     "severity": "high",
                     "description": f"Load balancer {lb.get('id')} has no active connections",
                     "recommendation": "Consider removing if not in use",
-                    "potential_savings": lb.get("monthly_cost", 0),
+                    "potential_savings": lb.get("monthly_cost", 0) * savings_pct,
                     "category": "networking"
                 })
         
@@ -334,6 +391,7 @@ class EfficiencyAnalyzerAgent(BaseAgent):
         Returns:
             Dictionary with savings estimates
         """
+        currency = self.config.get("cost_estimation", {}).get("currency", "USD")
         total_savings = sum(i.get("potential_savings", 0) for i in inefficiencies)
         
         by_category = {}
@@ -347,7 +405,7 @@ class EfficiencyAnalyzerAgent(BaseAgent):
             "total_monthly_savings": total_savings,
             "total_annual_savings": total_savings * 12,
             "by_category": by_category,
-            "currency": "USD"  # Default, should be configurable
+            "currency": currency
         }
     
     def _generate_recommendations(
@@ -383,4 +441,3 @@ class EfficiencyAnalyzerAgent(BaseAgent):
             })
         
         return recommendations
-
